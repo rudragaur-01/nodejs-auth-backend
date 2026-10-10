@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import authRouter from "./modules/auth/auth.routes";
 
 const app = express();
 
@@ -13,5 +14,7 @@ app.get("/health", (req, res) => {
     message: "Server is running",
   });
 });
+
+app.use('/auth',authRouter)
 
 export default app;
