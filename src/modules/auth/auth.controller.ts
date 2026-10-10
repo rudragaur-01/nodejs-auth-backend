@@ -1,6 +1,11 @@
 import { RequestHandler } from "express";
 import { loginSchema, registerSchema } from "./auth.validation";
-import { loginUser, registerUser, verifyEmail } from "./auth.service";
+import { getUser, loginUser, registerUser, verifyEmail } from "./auth.service";
+import {
+  createAccessToken,
+  createRefreshToken,
+  verifyRefreshToken,
+} from "../../lib/token";
 
 export const registerController: RequestHandler = async (req, res) => {
   const result = registerSchema.safeParse(req.body);
@@ -84,9 +89,71 @@ export const loginController: RequestHandler = async (req, res) => {
   }
 };
 
-export const logoutController: RequestHandler = async (req, res) => {};
+export const refreshController: RequestHandler = async (req, res) => {
+  try {
+    const token = req.cookies?.refreshToken;
 
-export const refreshController: RequestHandler = async (req, res) => {};
+    if (!token) {
+      return res.status(401).json({
+        message: "Refresh token is required",
+      });
+    }
+
+    const payload = verifyRefreshToken(token);
+    const user = await getUser(payload);
+
+    if (!user) {
+      return res.status(401).json({
+        message: "Invalid refresh token",
+      });
+    }
+
+    const accessToken = createAccessToken(user);
+    const refreshToken = createRefreshToken(user);
+    const isProd = process.env.NODE_ENV === "production";
+
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: "/",
+    });
+
+    return res.status(200).json({
+      message: "Token refreshed successfully",
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        isVerified: user.is_email_verified,
+      },
+      accessToken,
+    });
+  } catch (error) {
+    console.error("Refresh token error:", error);
+
+    return res.status(401).json({
+      message: "Invalid or expired refresh token",
+    });
+  }
+};
+
+export const logoutController: RequestHandler = async (req, res) => {
+  const isProd = process.env.NODE_ENV === "production";
+
+  res.clearCookie("refreshToken", {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: "lax",
+    path: "/",
+  });
+
+  return res.status(200).json({
+    message: "Logout successful",
+  });
+};
 
 export const forgotPasswordController: RequestHandler = async (req, res) => {};
 

@@ -141,3 +141,14 @@ export async function loginUser(data: LoginInput) {
   const isProd = process.env.NODE_ENV;
   return { user, accessToken, refreshToken };
 }
+
+export async function getUser(data: { sub: string }) {
+  const result = await pool.query(
+    `
+    SELECT id, name, email, is_email_verified FROM users
+    WHERE id = $1 AND is_email_verified = TRUE
+    `,
+    [data.sub],
+  );
+  return result.rows[0] ?? null
+}
